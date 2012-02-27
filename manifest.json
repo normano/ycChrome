@@ -1,0 +1,23 @@
+{
+  "name": "New Recommender for Hacker News at YC",
+  "version": "0.1",
+  "description": "Imagine having your browser find things that are interesting to you on your browser as your flip the pages on Hacker News! That's what this does!",
+  "permissions": [
+	"notifications",
+	"tabs",
+    "http://news.ycombinator.com/*"
+  ],
+  "background_page": "background.html",
+  "options_page": "options.html",
+  "page_action": {
+	"default_icon": "icon.png",
+    "default_title": "Our recommender is online!"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://news.ycombinator.com/*"],
+      "css": [],
+      "js": ["jquery.min.js", "md5.js", "naivebayes.js"]
+    }
+  ]
+}

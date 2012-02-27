@@ -1,0 +1,118 @@
+<html>
+<head>
+<script>
+// First run? Set these
+if(localStorage.getItem('hnNROnline') === null)
+{
+	localStorage.setItem('hnNROnline', 'yes');
+}
+	
+if(localStorage.getItem('classObjs') === null){
+	var defaultObj = {
+				'notInterested': { wordCounts: {}, hashes: [], titleList: [] }, 
+				'interested': { wordCounts:{}, hashes: [], titleList: [] }
+			};
+	localStorage.setItem('classObjs', JSON.stringify(defaultObj));
+}
+
+// Page basis
+var online = localStorage.getItem('hnNROnline');
+var newsUrl = new RegExp("news.ycombinator.com", "i");
+
+function setPageAction(tab)
+{
+	var iconImg = "icon.png";
+	if(online === "yes")
+	{
+		iconImg = "iconOff.png";
+		title = "Offline"
+		online = "no";
+	}
+	else
+	{
+		online = "yes";
+		title = "Our recommender is online!"
+	}
+	chrome.pageAction.setIcon({tabId: tab.id, path: iconImg});
+	chrome.pageAction.setTitle({tabId: tab.id, title: title});
+	localStorage.setItem('hnNROnline', online);
+}
+
+chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab){
+	if(tab.url.match(newsUrl))
+	{
+		if(changeInfo.status === "complete")
+		{
+			chrome.pageAction.show(tabId);
+		}
+		else
+		{
+			chrome.pageAction.hide(tabId);
+		}
+		
+		setPageAction(tab);
+	}
+});
+
+chrome.pageAction.onClicked.addListener(function(tab) {
+	setPageAction(tab);
+});
+
+chrome.extension.onRequest.addListener(function(messageData, sender, sendResponse){
+	var response = {}
+	
+	switch(messageData.request)
+	{
+		case "available":
+			if(!messageData.value)
+			{
+				response.status = online;
+			}
+			else
+			{
+				online = messageData.value
+				localStorage.setItem('hnNROnline', online);
+			}
+		break;
+		case "localStorage":
+			if(messageData.op === "get")
+			{
+				response[messageData.key] = localStorage.getItem(messageData.key);
+			}
+			else if(messageData.op === "set")
+			{
+				localStorage.setItem(messageData.key, messageData.value);
+			}
+			else if(messageData.op === "remove")
+			{
+				localStorage.removeItem(messageData.key);
+			}
+		break;
+		default:
+			response.statusMessage = "I don't know how to respond";
+	}
+	sendResponse(response);
+});
+
+/*
+// Create a simple text notification:
+var notification = webkitNotifications.createNotification(
+  '48.png',  // icon url - can be relative
+  'Hello!',  // notification title
+  'Lorem ipsum...'  // notification body text
+);
+
+// Or create an HTML notification:
+var notification = webkitNotifications.createHTMLNotification(
+  'notification.html'  // html url - can be relative
+);
+
+// Then show the notification.
+notification.show();
+*/
+ </script>
+</head>
+
+<body>
+</body>
+</html>

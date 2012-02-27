@@ -1,0 +1,3 @@
+HackerNews News recommender for Google Chrome
+
+Uses the naive bayes classifier for classification of posts you found interesting and were not interested in and grab the ones that were marked interesting.
