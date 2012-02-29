@@ -1,10 +1,10 @@
 <html>
 <head>
-<title>HackerNews Recommender Options</title>
+<title>HN News Recommender Options</title>
 <style>
 html
 {
-	background-image: -webkit-linear-gradient(270deg, #EEE -30%, #444 20%);
+	background-image: -webkit-linear-gradient(270deg, #EEE -170%, #444 30%, #444 70%, #EEE 200%);
 	height: 100%;
 }
 
@@ -14,19 +14,17 @@ body
 	width: 500px;
 	height: 100%;
 	display: table;
-	font-family: Segoe UI, Helevetca, Arial;
+	font-family: Segoe UI, Helvetica, Arial;
 }
 
-#pageBody
+h1
 {
-	vertical-align: middle;
-	display: table-cell;
+	font-size: 22pt;
 }
 
-#mainBody
+p
 {
-	background-image: -webkit-linear-gradient(270deg, #444 -30%, #EEE 20%);
-	padding: 20px;
+	padding: 2px;
 }
 
 button
@@ -44,6 +42,36 @@ button:active
 {
 	background-image: -webkit-linear-gradient(90deg, #444 -30%, #502030 80%);
 }
+
+
+#pageBody
+{
+	vertical-align: middle;
+	display: table-cell;
+}
+
+#mainBody
+{
+	box-sizing: border-box;
+	border-radius: 10px;
+	background: #EEE;
+}
+
+.header
+{
+	box-sizing: border-box;
+	background-image: -webkit-linear-gradient(270deg, #444 -70%, #EEE 90%);
+	padding: 10px 5px;
+	width: 100%;
+	border-radius: inherit;
+	text-align: center;
+}
+
+.body
+{
+	margin: 0 auto;
+	width: 95%;
+}
 </style>
 <script src="jquery.min.js"></script>
 </head>
@@ -51,14 +79,16 @@ button:active
 <body>
 	<div id='pageBody'>
 		<div id='mainBody'>
-			<div><h1>HackerNews Recommender</h1></div>
-			<div>
-				<button id="recommenderSwitch"></button>
-			</div>
+			<div class="header"><h1>HN News Recommender Options</h1></div>
+			<div class="body">
+				<div>
+					<button id="recommenderSwitch"></button>
+				</div>
 
-			<div>
-				<button id="removeData">Reset stored data</button>
-				<p>For v0.1 users, you are recommended to click this button if you have upgraded to v0.2. It is required that you close all hacker news tabs especially if you are still on v0.1! If you need to upgrade click <a href="http://normansoven.com/ycChrome/ycChrome.crx">here</a>.</p>
+				<div>
+					<button id="removeData">Reset stored data</button>
+					<p>For v0.1 users, you are recommended to click this button if you have upgraded to v0.2. It is required that you close all hacker news tabs especially if you are still on v0.1! If you need to upgrade click <a href="http://normansoven.com/ycChrome/ycChrome.crx">here</a>.</p>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -90,8 +120,12 @@ $(document).ready(function(){
 	});
 
 	$('#removeData').click(function(){
-		chrome.extension.sendRequest({request:"resetAllData"});
-		alert('Data has been reset.');
+		var confirm = window.confirm("You are about to reset the data you've collected.");
+		
+		if(confirm)
+			chrome.extension.sendRequest({request:"resetAllData"}, function(response){
+				alert("Data has been reset.");
+			});
 	});
 
 	// Set button's text status

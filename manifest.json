@@ -1,7 +1,7 @@
 {
-  "name": "New Recommender for Hacker News at YC",
-  "version": "0.2",
-  "description": "Imagine having your browser find things that are interesting to you on your browser as your flip the pages on Hacker News! That's what this does!",
+  "name": "HN News Recommender",
+  "version": "0.3",
+  "description": "Let me recommend stories to you. Get your recommendations on http://news.ycombinator.com.",
   "permissions": [
 	"notifications",
 	"tabs",

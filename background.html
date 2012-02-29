@@ -4,6 +4,12 @@
 <script src="jquery.min.js"></script>
 <script src="naiveBayes.js"></script>
 <script>
+// Attach listeners
+chrome.tabs.onUpdated.addListener(tabUpdated);
+chrome.pageAction.onClicked.addListener(setPageAction);
+chrome.extension.onRequest.addListener(sendRequestHandler);
+
+
 // First run?
 if(localStorage.getItem('hnNROnline') === null)
 {
@@ -16,6 +22,7 @@ var defaultObj = {
 };
 var classObjs = localStorage.getItem('classObjs');
 
+// Check if the classObj exists
 if((classObjs === null) || (classObjs === 'undefined')){
 	classObjs = defaultObj;
 	// Save it ... not needed now
@@ -45,10 +52,9 @@ else
 // Base data requirements
 var online = localStorage.getItem('hnNROnline');
 var newsUrl = new RegExp("news.ycombinator.com", "i");
-// Might have to create new instances of this for each tab.... not sure yet
-var hnClassifier = new NaiveBayesText(classObjs);
-// Debug purposes
-//console.log(hnClassifier.getClassObj());
+
+var hnClassifier = new NaiveBayesText(classObjs); // Create one single instance
+//console.log(hnClassifier.getClassObj()); // Debug purposes
 var tabsArticleData = {}; // Support for multiple tabs
 
 function setPageAction(tab)
@@ -70,7 +76,7 @@ function setPageAction(tab)
 	localStorage.setItem('hnNROnline', online);
 }
 
-chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab){
+function tabUpdated (tabId, changeInfo, tab){
 	if(tab.url.match(newsUrl))
 	{
 		if(changeInfo.status === "complete")
@@ -84,13 +90,9 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab){
 		
 		setPageAction(tab);
 	}
-});
+}
 
-chrome.pageAction.onClicked.addListener(function(tab) {
-	setPageAction(tab);
-});
-
-chrome.extension.onRequest.addListener(function(messageData, sender, sendResponse){
+function sendRequestHandler(messageData, sender, sendResponse){
 	var response = {}
 	switch(messageData.request)
 	{
@@ -156,7 +158,6 @@ chrome.extension.onRequest.addListener(function(messageData, sender, sendRespons
 		case "label":
 			// Online learning purposes only
 			// May add a new field to the tabsArticleData for labeling purposes
-			//console.log(messageData, sender); // Sender should include data we can use to find the dataset we are using for labeling
 			
 			// Base data
 			var tab = sender.tab; // Use, in case we want to label the intermediate set only
@@ -200,24 +201,7 @@ chrome.extension.onRequest.addListener(function(messageData, sender, sendRespons
 	// If the request is asking for a response.
 	if(sendResponse)
 		sendResponse(response);
-});
-
-/*
-// Create a simple text notification:
-var notification = webkitNotifications.createNotification(
-  '48.png',  // icon url - can be relative
-  'Hello!',  // notification title
-  'Lorem ipsum...'  // notification body text
-);
-
-// Or create an HTML notification:
-var notification = webkitNotifications.createHTMLNotification(
-  'notification.html'  // html url - can be relative
-);
-
-// Then show the notification.
-notification.show();
-*/
+}
  </script>
 </head>
 
