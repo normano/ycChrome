@@ -1,115 +1,91 @@
-function removePunc(str){
-	return str.replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ");
-}
-
-function normalizeString(str)
-{
-	return removePunc(str).toLowerCase();
-}
-
-// When more link is pressed
-function processData(elements){
-	var linkList = elements.attr('href');
-	// Let's go through the titles
-	elements.each(function(index){
-		var sTitle = normalizeString($(this).html());
-		var hash = hex_md5(sTitle+linkList[index]);
-		var allHashes = $.merge($.merge([], classObjs['notInterested'].hashes), classObjs['interested'].hashes);
-		
-		// Make sure we've never seen the title before
-		if($.inArray(hash, allHashes) < 0 )
-		{
-			// Label the data as not interested
-			hnClassifier.label(hash, 0);
-			
-			// Add title to titles list
-			classObjs['notInterested'].titleList.push(sTitle);
-		}
-	});
-};
-
-var NaiveBayesText = function(){
-	var classObjs;
+// General naive bayes implementation for my purposes
+var NaiveBayesText = function(classObjs){
+	var totalHashCounts = {'total': 0}; // Total number of hashes in each class
+	var totalUWC = {}; // Total word count for each word regardless of class
+	var totalFeatures = 0; // Total vocabulary for our purposes
+	var labels = [];
+	var hashes = [];
+	var wordCounts = [];
 	
-	// Send request to background page
-	chrome.extension.sendRequest({request: "localStorage", op:"get", key:"classObjs"}, 
-		function(response){
-			classObjs = this.classObjs = JSON.parse(response.classObjs);
-			
-			// Start off the classification process
-			$(window).trigger('dataAvailable');
-		}
-	)
-	
-	// I question some of my decisions made in the data structure.
-	this.getClassObjs = function(){
-		return classObjs;
-	}
-	
-	this.label = function(hash, label){
-		// Will probably use this for aggregated data some day
-		//	labelData[hash] = label;
-		
-		// For now we have two lists
-		if(label === 1)
-		{
-			labelName = "interested"
-		}
-		else
-		{
-			labelName = "notInterested"
-			label = 0; // Enforce not interested label
-		}	
-		
-		classObjs[labelName].hashes.push(hash);
-	}
-	
-	this.classify = function(sentence){
-		var wordList = normalizeString(sentence).split(' ');
-		var classPredProb = [];
-		var decisionLabel = 0;
-		var totalHashCount = {'total': 0}; // Total number of hashes in each class
-		var totalWordCount = {'total': 0}; // Total counts for class
-		var wc = {}; // Total word count for each word regardless of class
-		var totalVocabulary = 0;
-		
-		
+	// On startup
+	// Will probably make this part of the object prototype so it can be overridden
+	var init = function(){
 		// Go through the classes to calculate some statistics
-		$.each(classObjs, function(className, classObj){
-			// Count Hashes
-			(totalHashCount[className]) ? (totalHashCount[className] += classObj.hashes.length) : totalHashCount[className] = classObj.hashes.length;
+		$.each(classObjs, function(className, classLabel){
+			// Deconstruct class object
+			labels.push(className); // Push the name of the class
+			hashes.push(classLabel.hashes);
+			wordCounts.push(classLabel.wordCounts);
 			
-			totalHashCount.total += classObj.hashes.length;
+			// Add hash count
+			classHashCount = classLabel.hashes.length;
+			(totalHashCounts[className]) ? (totalHashCounts[className] += classHashCount) : totalHashCounts[className] = classHashCount;
+			totalHashCounts.total += classHashCount;
 			
 			// Count words
-			$.each(classObj.wordCounts, function(wordLabel, wordCount){
-				(totalWordCount[className]) ? totalWordCount[className] += wordCount : totalWordCount[className] = wordCount;
-				(wc[wordLabel]) ? wc[wordLabel]+=wordCount : wc[wordLabel]=wordCount;
-				totalVocabulary++;
-				totalWordCount.total += wordCount;
+			$.each(classLabel.wordCounts, function(wordLabel, wordCount){
+				(totalUWC[wordLabel]) ? totalUWC[wordLabel]+=wordCount : totalUWC[wordLabel]=wordCount;
+				totalFeatures++; // Counting unique words
 			});
 			
 		});
-
-		//console.log(totalHashCount, totalWordCount);
+	}
+	
+	this.dataCount = function(){
+		return totalHashCounts.total;
+	};
+	
+	this.getClassObj = function(){
+		// Reconstruct class object
+		resultObj = {};
+		$.each(labels, function(index){
+			resultObj[labels[index]] = {'wordCounts': wordCounts[index], 'hashes': hashes[index]};
+		});
+		
+		return resultObj;
+	}
+	
+	// Returns bool, values indicates whether it exists or not
+	this.dataExists = function(hash)
+	{
+		return ($.inArray(hash, hashes.reduce(function(a,b){return $.merge($.merge([],a),b)})) >= 0)
+	}
+	
+	this.label = function(hash, label){		
+		// Make sure label chosen is correct
+		if(label >= labels.length)
+		{
+			label = 0; // Enforce not interested label
+		}
+		
+		hashes[label].push(hash); // Adding hash
+		totalHashCounts.total++; // Increment hash count
+	}
+	
+	this.classify = function(sentence){
+		var wordList = sentence.split(' ');
+		var classPredProb = [];
+		var decisionLabel = 0;
+		var totalVocabulary = 0;
 		
 		// Go through classes to start classification
-		$.each(classObjs, function(className, classObj){
+		$.each(labels, function(index){
+			var className = labels[index]
 			// Calculate probabilities
 			var probability = 1; // P(class | sentence)
 			var weight = 1;
-			var priorClass = (totalHashCount[className]+1)/(totalHashCount['total']+2);
+			var priorClass = (totalHashCounts[className]+1)/(totalHashCounts['total']+2);
 			
 			// We need to weight our stories
 			weight = ((className === "notInterested") ? .3 : 4)
 			
 			// Figure out probabilites of classes using the words
-			$.each(wordList, function(index){
+			$.each(wordList, function(windex){
 				// If the word exists then perfecto, else it has no reason being here, I could be wrong.
-				if(classObj.wordCounts[wordList[index]])
+				if(wordCounts[index][wordList[windex]])
 				{
 					// log(P(word | classLabel))
-					var probWord = Math.log((classObj.wordCounts[wordList[index]]/wc[wordList[index]])); // Rel. frequency of term in class
+					var probWord = Math.log((wordCounts[index][wordList[windex]]/totalUWC[wordList[windex]])); // Rel. frequency of term in class
 					
 					probability += probWord; // sum up
 				}
@@ -119,127 +95,72 @@ var NaiveBayesText = function(){
 			
 			classPredProb.push(probability); // Finished, final probability for class
 		});
-		
-		
-		//console.log(classPredProb, Math.max.apply(null, classPredProb));
-		
+		// Debug purposes
+		//console.log(classPredProb);
 		// Find class with the maximum probability
 		decisionLabel = $.inArray(Math.max.apply(null, classPredProb), classPredProb);
 		
 		return decisionLabel;
 	}
 
-	this.train = function(){
-		// Iterate through classes and calculate probablities
-		$.each(classObjs, function(className, classObj){
-			var allTitles = "";
-			var titleList = classObj.titleList;
-			var titlesCount = titleList.length;
-			
-			// Iterate through titles list
-			$.each(titleList, function(index){
-				var sTitle = normalizeString(titleList[index]); // Sanitize
-				// Aggregate titles
-				allTitles = allTitles + sTitle + ((index+1 != titlesCount) ? " ": "");
-			});
-			
-			var titleWordList = allTitles.split(' ');
-			var totalTitleWords = titleWordList.length;
-			
-			
+	this.train = function(textData){
+		var countWords = function(wordList, classLabel){
 			// Count the words
-			titleWordList.map(function(word){
-				(classObj.wordCounts[word]) ? (classObj.wordCounts[word]++) : classObj.wordCounts[word] = 1;
+			wordList.map(function(word){
+				// increment wordcount by one or create feature
+				if(wordCounts[classLabel][word])
+				{
+					// Word exists already
+					wordCounts[word]++;
+					totalUWC[word]++;
+				}
+				else
+				{
+					wordCounts[classLabel][word] = 1;
+					totalFeatures++; // increase total word count
+					totalUWC[word] = 1;
+				}
 			});
+		}
+		
+		// Starts here
+		if((typeof textData) === 'array')
+		{
+			// For now we assume any array of data is data we are not interested in
+			textData.map(function(text){
+				var titleWordList = text.split(' ');
+				countWords(titleWordList, 0);
+			});
+		}
+		else if((typeof textData) === 'string')
+		{
+			// Assume data is what we are interested in
 			
-			// Clear Title List
-			classObj.titleList = [];
+			// Make a word list from the title
+			var titleWordList = textData.split(' ');
+			countWords(titleWordList, 1);
+		}
+	}
+	
+	this.processData = function(elements){
+		// Let's go through the titles
+		$.each(elements, function(index){
+			var sTitle = elements[index].title;
+			var link = elements[index].link;
+			var hash = hex_md5(sTitle+link);
+			var allHashes = $.merge($.merge([], classObjs['notInterested'].hashes), classObjs['interested'].hashes);
+			
+			// Make sure we've never seen the title before
+			if($.inArray(hash, allHashes) < 0 )
+			{
+				// Label the data as not interested
+				this.label(hash, 0);
+				
+				// Add title to titles list
+				classObjs['notInterested'].titleList.push(sTitle);
+			}
 		});
 	}
 	
-	$(window).bind('beforeunload', function(event){
-		// Save for persistence
-		if(hnClassifier === undefined) return;
-		chrome.extension.sendRequest({request: "localStorage", op:"set", key:"classObjs", value: JSON.stringify(hnClassifier.getClassObjs())}, 
-			function(response){
-			// Nil
-			}
-		)
-	});
+	init(); // initialize
 };
-
-var extOnline = false;
-var hnClassifier = new NaiveBayesText();
-$(window).bind('dataAvailable', function(){
-	// Send request to extension to see if its online
-	chrome.extension.sendRequest({request: "available"}, function(response){
-		extOnline = response.status;
-
-		// Check if extension is online
-		if(extOnline == "yes")
-		{
-			// Data Extraction
-			
-			// Extract titles from page, except the more link
-			var titlesEle = $('.title a').slice(1, -1);
-			var titlesCount = titlesEle.length;
-			var classObjs = hnClassifier.getClassObjs(); // naming compatibility
-			var enoughData = ($.merge($.merge([], classObjs['notInterested'].hashes), classObjs['interested'].hashes).length >= 60);
-			
-			// Try to classify
-			$(titlesEle).each(function(){
-				var element = $(this);
-				var title = element.text();
-				
-				// We need enough data in order ot do anything.
-				if(enoughData == true)
-				{
-					var decision = hnClassifier.classify(title);
-					
-					// Lets see if it works
-					if(decision == 1)
-					{
-						// Change color
-						element.css({backgroundColor: "#C03010", color: "#FFF"});
-					}
-				}	
-			});
-
-			// debug information
-			//console.log(classObjs);
-
-			// Add a listener to listen for clicks on the elements
-			$(window).delegate(".title a", 'click', function(event){
-				// If we clicked the more button process dataset
-				if( $(this).text() === "More")
-				{
-					// Process dataset
-					processData(titlesEle);
-					
-					// Train classifier
-					hnClassifier.train(classObjs);
-					
-					return; // Get out of here
-				}
-				
-				// create hash from title and link
-				var link = $(this).attr('href');
-				var sTitle = normalizeString($(this).html());
-				var hash = hex_md5(sTitle+link);
-				
-				// Have we been interested in this before?
-				if($.inArray(hash, classObjs['interested'].hashes ) < 0)
-				{
-					// Label the data
-					hnClassifier.label(hash, 1);
-				
-					// Add to titles list
-					classObjs['interested'].titleList.push(sTitle);
-				}
-				
-				// Debug information
-				//console.log(classObjs['interested'].hashes[hash], sTitle);	
-			});
-		}
-	});
-})

@@ -1,6 +1,6 @@
 {
   "name": "New Recommender for Hacker News at YC",
-  "version": "0.1",
+  "version": "0.2",
   "description": "Imagine having your browser find things that are interesting to you on your browser as your flip the pages on Hacker News! That's what this does!",
   "permissions": [
 	"notifications",
@@ -17,7 +17,8 @@
     {
       "matches": ["http://news.ycombinator.com/*"],
       "css": [],
-      "js": ["jquery.min.js", "md5.js", "naivebayes.js"]
+      "js": ["jquery.min.js", "dataExtractor.js"]
     }
-  ]
+  ],
+  "update_url": "http://normansoven.com/ycChrome/updates.xml"
 }

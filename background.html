@@ -1,23 +1,55 @@
 <html>
 <head>
+<script src="md5.js"></script>
+<script src="jquery.min.js"></script>
+<script src="naiveBayes.js"></script>
 <script>
-// First run? Set these
+// First run?
 if(localStorage.getItem('hnNROnline') === null)
 {
 	localStorage.setItem('hnNROnline', 'yes');
 }
+
+var defaultObj = {
+	'notInterested': { wordCounts: {}, hashes: []}, 
+	'interested': { wordCounts:{}, hashes: [] }
+};
+var classObjs = localStorage.getItem('classObjs');
+
+if((classObjs === null) || (classObjs === 'undefined')){
+	classObjs = defaultObj;
+	// Save it ... not needed now
+	localStorage.setItem('classObjs', JSON.stringify(classObjs));
 	
-if(localStorage.getItem('classObjs') === null){
-	var defaultObj = {
-				'notInterested': { wordCounts: {}, hashes: [], titleList: [] }, 
-				'interested': { wordCounts:{}, hashes: [], titleList: [] }
-			};
-	localStorage.setItem('classObjs', JSON.stringify(defaultObj));
+	// Let's notify user of a welcome message
+	var notification = webkitNotifications.createNotification(
+	  'icon.png',  // icon url - can be relative
+	  'First Run!',  // notification title
+	  "Hey! Thanks for installing me! \n \
+	   Currently, I need you to give some data, so I can recommend articles to you. I ll need you to go to HackerNews and (left-click) go to articles that interest you. It is required that you go through two pages (press the 'more' link twice of hacker news ot train me! \
+	   \n\n\
+	   Have Fun!"  // notification body text
+	);
+	
+	notification.show(); // Show that shiz
+	
+	// Close after  awhile
+	setTimeout(function(){notification.cancel()}, 15000);
+}
+else
+{
+	// Turn into JSON object
+	classObjs = JSON.parse(classObjs);
 }
 
-// Page basis
+// Base data requirements
 var online = localStorage.getItem('hnNROnline');
 var newsUrl = new RegExp("news.ycombinator.com", "i");
+// Might have to create new instances of this for each tab.... not sure yet
+var hnClassifier = new NaiveBayesText(classObjs);
+// Debug purposes
+//console.log(hnClassifier.getClassObj());
+var tabsArticleData = {}; // Support for multiple tabs
 
 function setPageAction(tab)
 {
@@ -54,13 +86,19 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab){
 	}
 });
 
+chrome.tabs.onRemoved.addListener(function(tabId, removeInfo){
+	if(tabsArticleData[tabId])
+	{
+		localStorage.setItem('classObjs', JSON.stringify(hnClassifier.getClassObj()));
+	}
+});
+
 chrome.pageAction.onClicked.addListener(function(tab) {
 	setPageAction(tab);
 });
 
 chrome.extension.onRequest.addListener(function(messageData, sender, sendResponse){
 	var response = {}
-	
 	switch(messageData.request)
 	{
 		case "available":
@@ -74,24 +112,99 @@ chrome.extension.onRequest.addListener(function(messageData, sender, sendRespons
 				localStorage.setItem('hnNROnline', online);
 			}
 		break;
-		case "localStorage":
-			if(messageData.op === "get")
+		case "classify":
+			// Base data
+			var articleData = messageData.data;
+			response.titleIndices = []; // Empty
+			
+			// We need enough data before we can classify
+			var trainedCount = hnClassifier.dataCount();
+			// Debug purposes
+			//console.log(trainedCount);
+			if(trainedCount < 60)
 			{
-				response[messageData.key] = localStorage.getItem(messageData.key);
+				response.statusMessage = "There's not enough data";
+				break;
 			}
-			else if(messageData.op === "set")
+			
+			///// send titles to extension for classification
+			// Try to classify
+			$.each(articleData, function(index){
+				var title = articleData[index].title;
+				var decision = hnClassifier.classify(title);
+				
+				// Lets see if it works
+				if(decision === 1)
+				{
+					// I recommend this!
+					response.titleIndices.push(index);
+				}
+			});
+		break;
+		case "train":
+			var tabId = sender.tab.id;
+			var tabArticleData = tabsArticleData[tabId];
+			var finalResultSet = [];
+			
+			// Create a new array of titles we have not stored
+			$.each(tabArticleData, function(index){
+				var article = tabArticleData[index];
+				var hash = hex_md5(article.title+article.link);
+				
+				// Add to result set and label it as not interested
+				if(!hnClassifier.dataExists(hash))
+				{
+					finalResultSet.push(article.title);
+					hnClassifier.label(hash, 0);
+				}
+			});
+			
+			hnClassifier.train(finalResultSet); // Array 
+		break;
+		case "label":
+			// Online learning purposes only
+			// May add a new field to the tabsArticleData for labeling purposes
+			//console.log(messageData, sender); // Sender should include data we can use to find the dataset we are using for labeling
+			
+			// Base data
+			var tab = sender.tab; // Use, in case we want to label the intermediate set only
+			var dataPoint = messageData.dataPoint;
+			var label = dataPoint.label;
+			var link = dataPoint.link;
+			var sTitle = dataPoint.title;
+			
+			// create hash from title and link
+			var hash = hex_md5(sTitle+link);
+			
+			// Only if we've never encountered the data point before
+			if(!hnClassifier.dataExists(hash))
 			{
-				localStorage.setItem(messageData.key, messageData.value);
+				// Label the data
+				hnClassifier.label(hash, label);
+				hnClassifier.train(sTitle);
 			}
-			else if(messageData.op === "remove")
-			{
-				localStorage.removeItem(messageData.key);
-			}
+		break;
+		case "addTabData":
+			var tabId = sender.tab.id;
+			tabsArticleData[tabId] = messageData.data;
+		break;
+		case "removeTabData":
+			var tabId = sender.tab.id;
+			tabsArticleData[tabId] = [];
+		break;
+		case "resetAllData":
+			// First clear the class object then reinitialize.
+			classObjs = defaultObj;
+			hnClassifier = new NaiveBayesText(classObjs);
+			tabsArticleData = {};
 		break;
 		default:
 			response.statusMessage = "I don't know how to respond";
 	}
-	sendResponse(response);
+	
+	// If the request is asking for a response.
+	if(sendResponse)
+		sendResponse(response);
 });
 
 /*

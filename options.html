@@ -58,6 +58,7 @@ button:active
 
 			<div>
 				<button id="removeData">Reset stored data</button>
+				<p>For v0.1 users, you are recommended to click this button if you have upgraded to v0.2. It is required that you close all hacker news tabs especially if you are still on v0.1! If you need to upgrade click <a href="http://normansoven.com/ycChrome/ycChrome.crx">here</a>.</p>
 			</div>
 		</div>
 	</div>
@@ -85,15 +86,12 @@ $(document).ready(function(){
 		extOnline = ((extOnline === "yes") ? "no" : "yes");
 		localStorage.setItem('hnNROnline', extOnline);
 		toggleOnlineStatus();
-		chrome.extension.sendRequest({request:"available", value:extOnline}, function(){});
+		chrome.extension.sendRequest({request:"available", value:extOnline});
 	});
 
 	$('#removeData').click(function(){
-		var defaultObj = {
-				'notInterested': { wordCounts: {}, hashes: [], titleList: [] }, 
-				'interested': { wordCounts:{}, hashes: [], titleList: [] }
-			};
-		localStorage.setItem('classObjs', JSON.stringify(defaultObj));
+		chrome.extension.sendRequest({request:"resetAllData"});
+		alert('Data has been reset.');
 	});
 
 	// Set button's text status
