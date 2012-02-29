@@ -1,6 +1,7 @@
 // General naive bayes implementation for my purposes
 var NaiveBayesText = function(classObjs){
 	var totalHashCounts = {'total': 0}; // Total number of hashes in each class
+	var totalWordCounts = [];
 	var totalUWC = {}; // Total word count for each word regardless of class
 	var totalFeatures = 0; // Total vocabulary for our purposes
 	var labels = [];
@@ -72,12 +73,12 @@ var NaiveBayesText = function(classObjs){
 		$.each(labels, function(index){
 			var className = labels[index]
 			// Calculate probabilities
-			var probability =  1; // P(class | sentence)
+			var probability =  0; // P(class | sentence)
 			var weight = 1;
 			var priorClass = (totalHashCounts[className]+1)/(totalHashCounts['total']+2);
 			
 			// We need to weight our stories
-			weight = ((className === "notInterested") ? .3 : 4)
+			weight = ((className === "notInterested") ? .5 : 4)
 			
 			// Figure out probabilites of classes using the words
 			$.each(wordList, function(windex){
@@ -85,18 +86,18 @@ var NaiveBayesText = function(classObjs){
 				if(wordCounts[index][wordList[windex]])
 				{
 					// log(P(word | classLabel))
-					var probWord = Math.log((wordCounts[index][wordList[windex]]/totalUWC[wordList[windex]])); // Rel. frequency of term in class
+					var probWord = Math.log(wordCounts[index][wordList[windex]]) - Math.log(totalUWC[wordList[windex]]); // Rel. frequency of term in class
 					
 					probability += probWord; // sum up
 				}
 			});
 
-			probability += Math.log(priorClass*weight); // sum up
+			probability += Math.log(priorClass)+ Math.log(weight); // sum up
 			
 			classPredProb.push(probability); // Finished, final probability for class
 		});
 		// Debug purposes
-		console.log(classPredProb);
+		//console.log(classPredProb);
 		// Find class with the maximum probability
 		decisionLabel = $.inArray(Math.max.apply(null, classPredProb), classPredProb);
 		
