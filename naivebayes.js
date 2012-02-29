@@ -72,7 +72,7 @@ var NaiveBayesText = function(classObjs){
 		$.each(labels, function(index){
 			var className = labels[index]
 			// Calculate probabilities
-			var probability = 1; // P(class | sentence)
+			var probability =  1; // P(class | sentence)
 			var weight = 1;
 			var priorClass = (totalHashCounts[className]+1)/(totalHashCounts['total']+2);
 			
@@ -90,13 +90,13 @@ var NaiveBayesText = function(classObjs){
 					probability += probWord; // sum up
 				}
 			});
-			
+
 			probability += Math.log(priorClass*weight); // sum up
 			
 			classPredProb.push(probability); // Finished, final probability for class
 		});
 		// Debug purposes
-		//console.log(classPredProb);
+		console.log(classPredProb);
 		// Find class with the maximum probability
 		decisionLabel = $.inArray(Math.max.apply(null, classPredProb), classPredProb);
 		
@@ -111,7 +111,7 @@ var NaiveBayesText = function(classObjs){
 				if(wordCounts[classLabel][word])
 				{
 					// Word exists already
-					wordCounts[word]++;
+					wordCounts[classLabel][word]++;
 					totalUWC[word]++;
 				}
 				else
@@ -124,7 +124,7 @@ var NaiveBayesText = function(classObjs){
 		}
 		
 		// Starts here
-		if((typeof textData) === 'array')
+		if(textData instanceof Array)
 		{
 			// For now we assume any array of data is data we are not interested in
 			textData.map(function(text){

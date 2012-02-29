@@ -158,7 +158,7 @@ chrome.extension.onRequest.addListener(function(messageData, sender, sendRespons
 					hnClassifier.label(hash, 0);
 				}
 			});
-			
+			console.log(typeof finalResultSet,finalResultSet);
 			hnClassifier.train(finalResultSet); // Array 
 		break;
 		case "label":
