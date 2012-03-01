@@ -1,3 +1,13 @@
 HackerNews News recommender for Google Chrome
 
 Uses the naive bayes classifier for classification of posts you found interesting and were not interested in and grab the ones that were marked interesting.
+
+How to use:
+If you currently have the extension installed, remove it.
+1. On the extensions page, check developer mode if you haven't already.
+2. Click Load unpacked extension and go to the folder that contains the source code.
+Done, simple as pie!.
+
+When ever you make changes to your version of the extension, while on the extensions page,click reload under the extension.
+
+Hope this helps!
