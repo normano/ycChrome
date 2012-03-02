@@ -2,11 +2,11 @@
 <head>
 <script src="md5.js"></script>
 <script src="jquery.min.js"></script>
-<script src="naiveBayes.js"></script>
+<script src="naivebayes.js"></script>
 <script>
 // Attach listeners
 chrome.tabs.onUpdated.addListener(tabUpdated);
-chrome.pageAction.onClicked.addListener(setPageAction);
+chrome.pageAction.onClicked.addListener(clickedPageAction);
 chrome.extension.onRequest.addListener(sendRequestHandler);
 
 
@@ -62,33 +62,49 @@ function setPageAction(tab)
 	var iconImg = "icon.png";
 	if(online === "yes")
 	{
+		title = "Our recommender is online!"
+	}
+	else
+	{
 		iconImg = "iconOff.png";
 		title = "Offline"
+	}
+	chrome.pageAction.setIcon({tabId: tab.id, path: iconImg});
+	chrome.pageAction.setTitle({tabId: tab.id, title: title});
+}
+
+function clickedPageAction(tab)
+{
+	togglePageAction();
+	setPageAction(tab);
+}
+
+function togglePageAction()
+{
+	if(online === "yes")
+	{
 		online = "no";
 	}
 	else
 	{
 		online = "yes";
-		title = "Our recommender is online!"
 	}
-	chrome.pageAction.setIcon({tabId: tab.id, path: iconImg});
-	chrome.pageAction.setTitle({tabId: tab.id, title: title});
+	
 	localStorage.setItem('hnNROnline', online);
 }
 
 function tabUpdated (tabId, changeInfo, tab){
 	if(tab.url.match(newsUrl))
 	{
+		setPageAction(tab);
 		if(changeInfo.status === "complete")
 		{
 			chrome.pageAction.show(tabId);
 		}
-		else
-		{
-			chrome.pageAction.hide(tabId);
-		}
-		
-		setPageAction(tab);
+	}
+	else
+	{
+		chrome.pageAction.hide(tabId);
 	}
 }
 
@@ -157,7 +173,7 @@ function sendRequestHandler(messageData, sender, sendResponse){
 		break;
 		case "label":
 			// Online learning purposes only
-			// May add a new field to the tabsArticleData for labeling purposes
+			// May add a new field to the tabsArticleData for labeling purposesi
 			
 			// Base data
 			var tab = sender.tab; // Use, in case we want to label the intermediate set only

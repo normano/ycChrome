@@ -43,6 +43,19 @@ button:active
 	background-image: -webkit-linear-gradient(90deg, #444 -30%, #502030 80%);
 }
 
+input[type="radio"]+label
+{
+	display: block;
+	padding: 10px;
+	background-image: -webkit-linear-gradient(270deg, #402010 -30%, #802030 80%);
+	color: #FFF;
+	cursor: pointer;
+}
+
+input[type="radio"]+label:active
+{	
+	background-image: -webkit-linear-gradient(90deg, #444 -30%, #502030 80%);
+}
 
 #pageBody
 {
@@ -67,7 +80,7 @@ button:active
 	text-align: center;
 }
 
-.body
+.settingsBody
 {
 	margin: 0 auto;
 	width: 95%;
@@ -80,7 +93,15 @@ button:active
 	<div id='pageBody'>
 		<div id='mainBody'>
 			<div class="header"><h1>HN News Recommender Options</h1></div>
-			<div class="body">
+			<div class="settingsBody">
+				<div>
+					<h3>Reading Frequency:</h3>
+					<input id="readFreq1" type="radio" name="readFreq" value="1"><label for="readFreq1">I like casual. (About 2 pages)</label>
+					<input id="readFreq2" type="radio" name="readFreq" value="2"><label for="readFreq2">I'm an Average Reader (5-10 pages)</label>
+					<input id="readFreq3" type="radio" name="readFreq" value="3"><label for="readFreq3">I like reading a lot! (> 10 pages)</label>
+				</div>
+				
+				<h3>Other settings:</h3>
 				<div>
 					<button id="recommenderSwitch"></button>
 				</div>
