@@ -1,5 +1,5 @@
 // General naive bayes implementation for my purposes
-var NaiveBayesText = function(classObjs){
+var NaiveBayesText = function(classObjs, weights){
 	var totalHashCounts = {'total': 0}; // Total number of hashes in each class
 	var totalWordCounts = [];
 	var totalUWC = {}; // Total word count for each word regardless of class
@@ -70,34 +70,57 @@ var NaiveBayesText = function(classObjs){
 		var totalVocabulary = 0;
 		
 		// Go through classes to start classification
-		$.each(labels, function(index){
-			var className = labels[index]
+		$.each(labels, function(classIndex){
+			var className = labels[classIndex]
 			// Calculate probabilities
 			var probability =  0; // P(class | sentence)
 			var weight = 1;
 			var priorClass = (totalHashCounts[className]+1)/(totalHashCounts['total']+2);
+
+			/////// FEATURE: Feature limiting
+			/////// Interested in looking towards avg(totalWordCount/uniqueWC) to figure out what the avg word count is for the class
+			var classStats = new classStatistics(wordCounts[classIndex]);
 			
 			// We need to weight our stories
-			weight = ((className === "notInterested") ? .5 : 4)
+			weight = weights[classIndex];
 			
 			// Figure out probabilites of classes using the words
-			$.each(wordList, function(windex){
+			$.each(wordList, function(wIndex){
 				// If the word exists then perfecto, else it has no reason being here, I could be wrong.
-				if(wordCounts[index][wordList[windex]])
+				if(wordCounts[classIndex][wordList[wIndex]])
 				{
-					// log(P(word | classLabel))
-					var probWord = Math.log(wordCounts[index][wordList[windex]]) - Math.log(totalUWC[wordList[windex]]); // Rel. frequency of term in class
+					var wordCount = wordCounts[classIndex][wordList[wIndex]];
+					var probWord = 0;
+
+					////// Once we have the avg, we can look at how far away the current word count we have using z scores
+					var zScore = (wordCount - classStats.wordMean)/classStats.wordStdDev;
+					
+					// Make sure word in sentence is is somewhat related
+					if((zScore >= -1.5) && (zScore <= 1.5))
+					{
+					// Debug
+					//console.log('Mean: ' + classStats.wordMean + ' Var: ' + classStats.wordVariance + ' z-Score: '+ zScore);
+						// log(P(word | classLabel))
+						probWord = (Math.log(wordCount) - Math.log(totalUWC[wordList[wIndex]])); // Rel. frequency of term in class
+					}
+					else
+					{
+						// Can assign penalty
+						probWord = 0;
+					}
 					
 					probability += probWord; // sum up
 				}
 			});
-
+			
 			probability += Math.log(priorClass)+ Math.log(weight); // sum up
 			
 			classPredProb.push(probability); // Finished, final probability for class
 		});
+
 		// Debug purposes
-		//console.log(classPredProb);
+		console.log(classPredProb);
+		
 		// Find class with the maximum probability
 		decisionLabel = $.inArray(Math.max.apply(null, classPredProb), classPredProb);
 		
@@ -123,7 +146,7 @@ var NaiveBayesText = function(classObjs){
 				}
 			});
 		}
-		
+
 		// Starts here
 		if(textData instanceof Array)
 		{
@@ -161,6 +184,40 @@ var NaiveBayesText = function(classObjs){
 				classObjs['notInterested'].titleList.push(sTitle);
 			}
 		});
+	}
+	
+	function classStatistics(wordCounts)
+	{
+		this.wordMean = 0; // E(X)
+		this.wordVariance = 0;
+		this.wordStdDev = 0; // Root of the Means of the Squared deviations
+		
+		if(wordCounts instanceof Array)
+		{
+			if(wordCounts.length > 0)
+			{
+				var wordMean = this.wordMean = wordCounts.reduce(function(count1,count2){ return count1+count2 })/wordCounts.length;
+				
+				
+				var squaredDeviations = wordCounts.map(function(count){ var squaredDeviation = Math.pow(count - wordMean, 2); return squaredDeviation;});
+				
+				var meanDeviation = squaredDeviations.reduce(function(sDev1, sDev2){ return sDev1+sDev2 })/wordCounts.length;
+				
+				this.wordVariance = meanDeviation;
+				
+				this.wordStdDev = Math.sqrt(meanDeviation);
+			}
+		}
+		else if(wordCounts instanceof Object)
+		{
+			var wordCountsList = [];
+			$.each(wordCounts, function(wordName, wordCounts){
+				wordCountsList.push(wordCounts);
+			});
+			
+			return new classStatistics(wordCountsList); // Makes my life easier
+		}
+		
 	}
 	
 	init(); // initialize

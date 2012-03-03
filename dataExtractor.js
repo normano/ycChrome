@@ -39,10 +39,12 @@ function initializeRequest(response)
 			var articleElements = titlesEle; // Not sure why I named this titlesEle
 			// Response will consist of title indices that have been labeled interesting
 			var titleIndices = response.titleIndices;
+			var recTextColors = response.textColors;
+			var recBackColors = response.highlightColors;
 			
 			$.each(titleIndices, function(index){
 				// Change color
-				$(articleElements[titleIndices[index]]).css({backgroundColor: "#C03010", color: "#FFF"});
+				$(articleElements[titleIndices[index]]).css({backgroundColor: recBackColors[index], color: recTextColors[index]});
 			});
 		}
 		

@@ -9,18 +9,50 @@ chrome.tabs.onUpdated.addListener(tabUpdated);
 chrome.pageAction.onClicked.addListener(clickedPageAction);
 chrome.extension.onRequest.addListener(sendRequestHandler);
 
-
-// First run?
-if(localStorage.getItem('hnNROnline') === null)
-{
-	localStorage.setItem('hnNROnline', 'yes');
-}
-
+// Base data requirements
 var defaultObj = {
 	'notInterested': { wordCounts: {}, hashes: []}, 
 	'interested': { wordCounts:{}, hashes: [] }
 };
+var online = localStorage.getItem('hnNROnline')
+var recTextColor = localStorage.getItem('recTextColor');
+var recHighTextColor = localStorage.getItem('recHighColor');
+var visitedText = localStorage.getItem('visitedColor'); // Looking to see if I can/want to add this
 var classObjs = localStorage.getItem('classObjs');
+var readFreq = localStorage.getItem('readFreq');
+var weights = [];
+var newsUrl = new RegExp("news.ycombinator.com", "i");
+var tabsArticleData = {}; // Support for multiple tabs
+
+///// Start sanity checks
+if(online === null)
+{
+	localStorage.setItem('hnNROnline', 'yes');
+}
+
+if(recTextColor === null)
+{
+	recTextColor = '#FFF';
+	localStorage.setItem('recTextColor', recTextColor);
+}
+
+if(recHighTextColor === null)
+{
+	recHighTextColor = '#8F1008';
+	localStorage.setItem('recHighColor', recHighTextColor);
+}
+
+if(visitedText === null)
+{
+	visitedText = '#2775B9';
+	localStorage.setItem('visitedColor', visitedText);
+}
+
+if(readFreq == null)
+{
+	readFreq = 1;
+	localStorage.setItem('readFreq', readFreq);
+}
 
 // Check if the classObj exists
 if((classObjs === null) || (classObjs === 'undefined')){
@@ -49,13 +81,12 @@ else
 	classObjs = JSON.parse(classObjs);
 }
 
-// Base data requirements
-var online = localStorage.getItem('hnNROnline');
-var newsUrl = new RegExp("news.ycombinator.com", "i");
+///// End sanity checks
 
-var hnClassifier = new NaiveBayesText(classObjs); // Create one single instance
+// Start the classifier
+weights = getWeights(readFreq);
+var hnClassifier = new NaiveBayesText(classObjs, weights); // Create one single instance
 //console.log(hnClassifier.getClassObj()); // Debug purposes
-var tabsArticleData = {}; // Support for multiple tabs
 
 function setPageAction(tab)
 {
@@ -127,6 +158,8 @@ function sendRequestHandler(messageData, sender, sendResponse){
 			// Base data
 			var articleData = messageData.data;
 			response.titleIndices = []; // Empty
+			response.textColors = [];
+			response.highlightColors = [];
 			
 			// We need enough data before we can classify
 			var trainedCount = hnClassifier.dataCount();
@@ -149,6 +182,8 @@ function sendRequestHandler(messageData, sender, sendResponse){
 				{
 					// I recommend this!
 					response.titleIndices.push(index);
+					response.textColors.push(recTextColor);
+					response.highlightColors.push(recHighTextColor);
 				}
 			});
 		break;
@@ -203,12 +238,36 @@ function sendRequestHandler(messageData, sender, sendResponse){
 			// If someone can think of a better place to put this :(
 			localStorage.setItem('classObjs', JSON.stringify(hnClassifier.getClassObj()));
 		break;
-		case "resetAllData":
+		case "resetColData":
 			// First clear the class object then reinitialize.
 			classObjs = defaultObj;
-			hnClassifier = new NaiveBayesText(classObjs);
+			hnClassifier = new NaiveBayesText(classObjs, weights);
 			tabsArticleData = {};
 			localStorage.setItem('classObjs', JSON.stringify(classObjs));
+		break;
+		case "changeColors":
+			if(messageData.type == 'recTextColor')
+			{
+				recTextColor = messageData.color;
+				localStorage.setItem('recTextColor', recTextColor);
+			}
+			else if(messageData.type == 'recHighColor')
+			{
+				recHighTextColor = messageData.color;
+				localStorage.setItem('recTextColor', recHighTextColor);
+			}
+			else if(messageData.type == 'recVisitedColor')
+			{
+				visitedText = messageData.color;
+				localStorage.setItem('visitedColor', visitedText);
+			}
+		break;
+		case "changeReadFreq":
+			readFreq = messageData.readFreq;
+			weights = getWeights(readFreq);
+			classObjs = hnClassifier.getClassObj(); // Save for now
+			hnClassifier = new NaiveBayesText(classObjs, weights); // Reinitialize
+			localStorage.setItem('readFreq', readFreq); // save read frequency
 		break;
 		default:
 			response.statusMessage = "I don't know how to respond";
@@ -217,6 +276,30 @@ function sendRequestHandler(messageData, sender, sendResponse){
 	// If the request is asking for a response.
 	if(sendResponse)
 		sendResponse(response);
+}
+
+function getWeights(readFreq)
+{
+	var weights;
+	switch(parseInt(readFreq))
+	{
+		case 1:
+			// Casual, chances are that you want more things to read
+			weights = [.7, 3];
+		break;
+		case 2: 
+			// Average, chances that you want some things to read
+			weights = [.5, 5];
+		break;
+		case 3:
+			// Heavy, chances you want more to read
+			weights = [.2, 6];
+		break;
+		default:
+			weights = [0, 0]; // wtf is wrong with you!
+	}
+	
+	return weights;
 }
  </script>
 </head>
