@@ -1,6 +1,6 @@
 HackerNews News recommender for Google Chrome
 
-Uses the naive bayes classifier for classification of posts you found interesting and were not interested in and grab the ones that were marked interesting.
+Uses the naive bayes classifier for classification of posts you found interesting and not interesting. It attempts to predict what you like based of your past interactions. If you'd like to learn more visit http://normansoven.com/blog/?p=651
 
 How to use:
 If you currently have the extension installed, remove it.
