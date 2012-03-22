@@ -119,7 +119,7 @@ var NaiveBayesText = function(classObjs, weights){
 		});
 
 		// Debug purposes
-		console.log(classPredProb);
+		//console.log(classPredProb);
 		
 		// Find class with the maximum probability
 		decisionLabel = $.inArray(Math.max.apply(null, classPredProb), classPredProb);

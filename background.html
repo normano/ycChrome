@@ -3,90 +3,197 @@
 <script src="md5.js"></script>
 <script src="jquery.min.js"></script>
 <script src="naivebayes.js"></script>
-<script>
-// Attach listeners
-chrome.tabs.onUpdated.addListener(tabUpdated);
-chrome.pageAction.onClicked.addListener(clickedPageAction);
-chrome.extension.onRequest.addListener(sendRequestHandler);
-
+<script type="text/javascript">
 // Base data requirements
 var defaultObj = {
 	'notInterested': { wordCounts: {}, hashes: []}, 
 	'interested': { wordCounts:{}, hashes: [] }
 };
-var online = localStorage.getItem('hnNROnline')
+var hnClassifier = null;
+
+///// Load from IndexedDB
+var dbVersion = 0.1;
+var indexedDB = window.indexedDB || window.webkitIndexedDB;
+var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction;
+var dbReq = indexedDB.open('newsRecommender', dbVersion);
+var newsRecDB = null;
+
+// Load from Local storage
+var online = localStorage.getItem('hnNROnline');
 var recTextColor = localStorage.getItem('recTextColor');
 var recHighTextColor = localStorage.getItem('recHighColor');
 var visitedText = localStorage.getItem('visitedColor'); // Looking to see if I can/want to add this
-var classObjs = localStorage.getItem('classObjs');
+var classObjs = localStorage.getItem('classObjs'); // A relic, will remove in v0.5
 var readFreq = localStorage.getItem('readFreq');
 var weights = [];
 var newsUrl = new RegExp("news.ycombinator.com", "i");
 var tabsArticleData = {}; // Support for multiple tabs
 
-///// Start sanity checks
-if(online === null)
-{
-	localStorage.setItem('hnNROnline', 'yes');
+// Attach db handlers
+dbReq.onsuccess = function(event){
+	newsRecDB = dbReq.result;
+	//console.log(newsRecDB); // debug only
+	
+	// Assuming this works eventually
+	newsRecDB.onversionchange = dbVersionChange;
+	
+	// Until the above works, we can use this
+	if(newsRecDB.version != dbVersion){
+		// Assuming this function is not removed in later versions
+		if(newsRecDB.setVersion)
+		{
+			var setV = newsRecDB.setVersion(dbVersion);
+			setV.onsuccess = dbVersionChange;
+		}
+	}
+	initalize();
+	
+	/* DEBUG ONLY
+	// Read database from IndexedDB
+	var dbTrans = newsRecDB.transaction(['websites']);
+	
+	dbTrans.oncomplete = function(event){
+		// Not sure what to do yet
+	};
+	
+	dbTrans.onerror = function(event){
+		// Handle these somehow
+	};
+	var objStoreGet = dbTrans.objectStore('websites').get('newsAtYC');
+	objStoreGet.onsuccess = function(event){
+		classObjs = event.target.result; // :) Good stuff, hmm i actually kind of hate it haha
+		console.log(classObjs);
+	}
+	*/
 }
 
-if(recTextColor === null)
-{
-	recTextColor = '#FFF';
-	localStorage.setItem('recTextColor', recTextColor);
+dbReq.onerror = function(){
+	alert("Unfortunately, the HH News Recommender could not open a database. It is suggested that you restart the browser to try again or contact the creator with this Error Code: "+event.target.errorCode);
 }
 
-if(recHighTextColor === null)
+function dbVersionChange(event)
 {
-	recHighTextColor = '#8F1008';
-	localStorage.setItem('recHighColor', recHighTextColor);
-}
-
-if(visitedText === null)
-{
-	visitedText = '#2775B9';
-	localStorage.setItem('visitedColor', visitedText);
-}
-
-if(readFreq == null)
-{
-	readFreq = 1;
-	localStorage.setItem('readFreq', readFreq);
-}
-
-// Check if the classObj exists
-if((classObjs === null) || (classObjs === 'undefined')){
-	classObjs = defaultObj;
-	// Save it ... not needed now
-	localStorage.setItem('classObjs', JSON.stringify(classObjs));
+//TODO: Will have to handle the issue of rollbacks incase of an error
+	var objStore = {};
+	if(!newsRecDB.objectStoreNames.contains('websites'))
+	{
+		// Using this the wrong way, but I'm lazy right now and this db async stuff is weird.
+		// I like blocked for small things like this
+		///// Create datastore
+		// Possible point of expanding the extension, which is why this is named that way
+		objStore = newsRecDB.createObjectStore("websites", {keyPath: "name"});
+		
+	}
+	else
+	{
+		objStore = newsRecDB.transaction(['websites'], IDBTransaction.READ_WRITE).objectStore("websites");
+	}
+	
+	//console.log(objStore);
+	
+	objStore.onsuccess = function(event){
+		
+		// Check if classObj exists
+		if((classObjs === null) || (classObjs === 'undefined')){
+			//classObjs = defaultObj;
+			// Save it ... not needed now
+			//localStorage.setItem('classObjs', JSON.stringify(classObjs));
+		}
+		else
+		{
+			// Turn into JSON object
+			classObjs = JSON.parse(classObjs);
+			
+			// Delete item from localStorage
+			localStorage.removeItem('classObjs');
+			
+			// Then store into indexedDB, this is the transition point
+			objStore.add({name: "newsAtYC", data: classObjs});
+		}
+		
+		// Make sure this thing exists
+		var newsYCData = objStore.get('newsAtYC');
+		newsYCData.onerror = function(event){
+			// If it doesn't exist create it
+			objStore.add({name: "newsAtYC", data: defaultObj});
+		}
+	}
 	
 	// Let's notify user of a welcome message
 	var notification = webkitNotifications.createNotification(
 	  'icon.png',  // icon url - can be relative
 	  'First Run!',  // notification title
-	  "Hey! Thanks for installing me! \n \
-	   Currently, I need you to give some data, so I can recommend articles to you. I ll need you to go to HackerNews and (left-click) go to articles that interest you. It is required that you go through two pages (press the 'more' link twice of hacker news ot train me! \
-	   \n\n\
+	  "Hey! Thanks for installing me! \
+	   If you haven not already (since you've installed me), it is required that you go through two pages (press the 'more' link twice) in hacker news to train me! \
 	   Have Fun!"  // notification body text
 	);
 	
 	notification.show(); // Show that shiz
 	
-	// Close after  awhile
+	// Close after awhile
 	setTimeout(function(){notification.cancel()}, 15000);
 }
-else
+
+function initalize()
 {
-	// Turn into JSON object
-	classObjs = JSON.parse(classObjs);
+	// Attach listeners
+	chrome.tabs.onUpdated.addListener(tabUpdated);
+	chrome.pageAction.onClicked.addListener(clickedPageAction);
+	chrome.extension.onRequest.addListener(sendRequestHandler);
+	
+	///// Start sanity checks
+	if(online === null)
+	{
+		localStorage.setItem('hnNROnline', 'yes');
+	}
+
+	if(recTextColor === null)
+	{
+		recTextColor = '#FFF';
+		localStorage.setItem('recTextColor', recTextColor);
+	}
+
+	if(recHighTextColor === null)
+	{
+		recHighTextColor = '#8F1008';
+		localStorage.setItem('recHighColor', recHighTextColor);
+	}
+
+	if(visitedText === null)
+	{
+		visitedText = '#2775B9';
+		localStorage.setItem('visitedColor', visitedText);
+	}
+
+	if(readFreq == null)
+	{
+		readFreq = 2;
+		localStorage.setItem('readFreq', readFreq);
+	}
+	///// End sanity checks
+	
+	// Read database from IndexedDB
+	var dbTrans = newsRecDB.transaction(['websites']);
+	
+	dbTrans.oncomplete = function(event){
+		// Not sure what to do yet
+	};
+	
+	dbTrans.onerror = function(event){
+		// Handle these somehow
+	};
+	
+	// Finally we can start
+	var objStoreGet = dbTrans.objectStore('websites').get('newsAtYC');
+	objStoreGet.onsuccess = function(event){
+		classObjs = event.target.result.data; // :) Good stuff, hmm i actually kind of hate it haha
+		console.log(classObjs);
+		// Start the classifier
+		weights = getWeights(readFreq);
+		hnClassifier = new NaiveBayesText(classObjs, weights); // Create one single instance
+		//console.log(hnClassifier.getClassObj()); // Debug purposes
+	}
 }
-
-///// End sanity checks
-
-// Start the classifier
-weights = getWeights(readFreq);
-var hnClassifier = new NaiveBayesText(classObjs, weights); // Create one single instance
-//console.log(hnClassifier.getClassObj()); // Debug purposes
 
 function setPageAction(tab)
 {
@@ -234,16 +341,23 @@ function sendRequestHandler(messageData, sender, sendResponse){
 		break;
 		case "removeTabData":
 			var tabId = sender.tab.id;
-			tabsArticleData[tabId] = [];
-			// If someone can think of a better place to put this :(
-			localStorage.setItem('classObjs', JSON.stringify(hnClassifier.getClassObj()));
+			delete tabsArticleData[tabId];
+			/*
+			  If someone can think of a better place to put this :(
+			  The intention is to save the classObjs whenever a tab is closed
+			  IDEALLY, it would be when the extension is closed or unloading, but chrome is finicky with 
+			  that so here we are.
+			*/
+			dbSaveClassObjs('newsAtYC', classObjs);
 		break;
 		case "resetColData":
 			// First clear the class object then reinitialize.
 			classObjs = defaultObj;
 			hnClassifier = new NaiveBayesText(classObjs, weights);
 			tabsArticleData = {};
-			localStorage.setItem('classObjs', JSON.stringify(classObjs));
+			
+			// Clear the data in the db
+			dbSaveClassObjs('newsAtYC', classObjs);
 		break;
 		case "changeColors":
 			if(messageData.type == 'recTextColor')
@@ -276,6 +390,13 @@ function sendRequestHandler(messageData, sender, sendResponse){
 	// If the request is asking for a response.
 	if(sendResponse)
 		sendResponse(response);
+}
+
+function dbSaveClassObjs(website, classObjs)
+{
+	//localStorage.setItem('classObjs', JSON.stringify(classObjs));
+	var dbTrans = newsRecDB.transaction(['websites'],IDBTransaction.READ_WRITE).objectStore('websites');
+	dbTrans.put({name: website, data: classObjs});
 }
 
 function getWeights(readFreq)

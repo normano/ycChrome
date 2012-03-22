@@ -68,7 +68,7 @@ function initializeRequest(response)
 		
 		function pageUnload(event)
 		{
-			// Send title elements for training
+			// Remove the stored tab's data
 			chrome.extension.sendRequest({request: "removeTabData"});
 		}
 	}
