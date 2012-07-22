@@ -3,6 +3,7 @@
 <script src="md5.js"></script>
 <script src="jquery.min.js"></script>
 <script src="naivebayes.js"></script>
+<script src="porterStemming.js"></script>
 <script type="text/javascript">
 // Base data requirements
 var defaultObj = {
@@ -187,7 +188,7 @@ function initalize()
 	var objStoreGet = dbTrans.objectStore('websites').get('newsAtYC');
 	objStoreGet.onsuccess = function(event){
 		classObjs = event.target.result.data; // :) Good stuff, hmm i actually kind of hate it haha
-		console.log(classObjs);
+		//console.log(classObjs);
 		// Start the classifier
 		weights = getWeights(readFreq);
 		hnClassifier = new NaiveBayesText(classObjs, weights); // Create one single instance
@@ -242,6 +243,7 @@ function tabUpdated (tabId, changeInfo, tab){
 	}
 	else
 	{
+		//TODO: When tab is closed this is fired off? Got to check what is going on.
 		chrome.pageAction.hide(tabId);
 	}
 }
@@ -264,7 +266,7 @@ function sendRequestHandler(messageData, sender, sendResponse){
 		case "classify":
 			// Base data
 			var articleData = messageData.data;
-			response.titleIndices = []; // Empty
+			response.titleIndices = [];
 			response.textColors = [];
 			response.highlightColors = [];
 			

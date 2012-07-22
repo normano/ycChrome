@@ -1,6 +1,6 @@
 {
   "name": "HN News Recommender",
-  "version": "0.4",
+  "version": "0.4.1",
   "description": "Let me recommend stories to you. Get your recommendations on http://news.ycombinator.com.",
   "permissions": [
 	"unlimitedStorage",
