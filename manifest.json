@@ -1,6 +1,7 @@
 {
   "name": "HN News Recommender",
   "version": "0.4.1",
+  "manifest_version": 2,
   "description": "Let me recommend stories to you. Get your recommendations on http://news.ycombinator.com.",
   "permissions": [
 	"unlimitedStorage",
@@ -8,7 +9,9 @@
 	"tabs",
     "http://news.ycombinator.com/*"
   ],
-  "background_page": "background.html",
+  "background": {
+		"page": "background.html"
+  },
   "options_page": "options.html",
   "page_action": {
 	"default_icon": "icon.png",
