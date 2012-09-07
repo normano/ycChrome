@@ -6,7 +6,7 @@ var defaultObj = {
 var hnClassifier = null;
 
 ///// Load from IndexedDB
-var dbVersion = 0.1;
+var dbVersion = 1;
 var indexedDB = window.indexedDB || window.webkitIndexedDB;
 var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction;
 var dbReq = indexedDB.open('newsRecommender', dbVersion);
@@ -80,7 +80,7 @@ function dbVersionChange(event)
 	}
 	else
 	{
-		objStore = newsRecDB.transaction(['websites'], IDBTransaction.READ_WRITE).objectStore("websites");
+		objStore = newsRecDB.transaction(['websites'], "readwrite").objectStore("websites");
 	}
 	
 	//console.log(objStore);
@@ -133,7 +133,7 @@ function initalize()
 	// Attach listeners
 	chrome.tabs.onUpdated.addListener(tabUpdated);
 	chrome.pageAction.onClicked.addListener(clickedPageAction);
-	chrome.extension.onRequest.addListener(sendRequestHandler);
+	chrome.extension.onMessage.addListener(sendRequestHandler);
 	
 	///// Start sanity checks
 	if(online === null)
@@ -390,7 +390,7 @@ function sendRequestHandler(messageData, sender, sendResponse){
 function dbSaveClassObjs(website, classObjs)
 {
 	//localStorage.setItem('classObjs', JSON.stringify(classObjs));
-	var dbTrans = newsRecDB.transaction(['websites'],IDBTransaction.READ_WRITE).objectStore('websites');
+	var dbTrans = newsRecDB.transaction(['websites'], "readwrite").objectStore('websites');
 	dbTrans.put({name: website, data: classObjs});
 }
 

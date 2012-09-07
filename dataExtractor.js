@@ -1,6 +1,6 @@
 // Send request to extension to see if its online
 var request = {request: "available"};
-chrome.extension.sendRequest(request, initializeRequest);
+chrome.extension.sendMessage(request, initializeRequest);
 
 // Start up the data extraction
 function initializeRequest(response)
@@ -30,9 +30,9 @@ function initializeRequest(response)
 			});
 			
 			// Store articles from current tab
-			chrome.extension.sendRequest({request: "addTabData", data: articleData});
+			chrome.extension.sendMessage({request: "addTabData", data: articleData});
 			// Send the titles to the classifier
-			chrome.extension.sendRequest({request: "classify", data: articleData}, classify);
+			chrome.extension.sendMessage({request: "classify", data: articleData}, classify);
 		}
 		
 		function classify(response)
@@ -55,14 +55,14 @@ function initializeRequest(response)
 			// If we clicked the more button to process dataset
 			if( element.text() === "More" )
 			{
-				chrome.extension.sendRequest({request: "train"});
+				chrome.extension.sendMessage({request: "train"});
 				return; // Nothing more needs to be done.
 			}
 			
 			// We've clicked on an article, so label as interesting
 			var textNormalized = normalizeString(element.text());
 			var link = element.attr('href');
-			chrome.extension.sendRequest({request: "label", dataPoint: {title: textNormalized, link:link, label: 1}});
+			chrome.extension.sendMessage({request: "label", dataPoint: {title: textNormalized, link:link, label: 1}});
 			
 			event.preventDefault(); // Yeah....
 			window.open(link, '_newtab');
@@ -71,7 +71,7 @@ function initializeRequest(response)
 		function pageUnload(event)
 		{
 			// Remove the stored tab's data
-			chrome.extension.sendRequest({request: "removeTabData"});
+			chrome.extension.sendMessage({request: "removeTabData"});
 		}
 	}
 }
