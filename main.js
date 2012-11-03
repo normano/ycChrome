@@ -3,53 +3,40 @@ var defaultObj = {
 	'notInterested': { wordCounts: {}, hashes: []}, 
 	'interested': { wordCounts:{}, hashes: [] }
 };
-var hnClassifier = null;
+var defaultClassifier = function(dataObj){};
 
 ///// Load from IndexedDB
-var dbVersion = 1;
+var dbVersion = 2;
 var indexedDB = window.indexedDB || window.webkitIndexedDB;
 var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction;
-var dbReq = indexedDB.open('newsRecommender', dbVersion);
+var dbReq = indexedDB.open('newsRecommender');
 var newsRecDB = null;
 
 // Load from Local storage
-var online = localStorage.getItem('hnNROnline');
+var online = localStorage.getItem('exCROnline');
 var recTextColor = localStorage.getItem('recTextColor');
 var recHighTextColor = localStorage.getItem('recHighColor');
 var visitedText = localStorage.getItem('visitedColor'); // Looking to see if I can/want to add this
-var classObjs = localStorage.getItem('classObjs'); // A relic, will remove in v0.5
 var readFreq = localStorage.getItem('readFreq');
 var weights = [];
-var newsUrl = new RegExp("news.ycombinator.com", "i");
+var websites = [
+  {'key': 'newsAtYC', 'regExp': new RegExp("news.ycombinator.com", "i"), 'classObjs': {}, 'classifier': defaultClassifier},
+  {'key': 'reddit', 'regExp': new RegExp("reddit.com", "i"), 'classObjs': {}, 'classifier': defaultClassifier}
+];
 var tabsArticleData = {}; // Support for multiple tabs
 
 // Attach db handlers
+dbReq.onupgradeneeded = dbVersionChange;
 dbReq.onsuccess = function(event){
+
+	// Grab db object and initalize the extension
 	newsRecDB = dbReq.result;
-	//console.log(newsRecDB); // debug only
-	
-	// Assuming this works eventually
-	newsRecDB.onversionchange = dbVersionChange;
-	
-	// Until the above works, we can use this
-	if(newsRecDB.version != dbVersion){
-		// Assuming this function is not removed in later versions
-		if(newsRecDB.setVersion)
-		{
-			var setV = newsRecDB.setVersion(dbVersion);
-			setV.onsuccess = dbVersionChange;
-		}
-	}
 	initalize();
 	
 	/* DEBUG ONLY
 	// Read database from IndexedDB
 	var dbTrans = newsRecDB.transaction(['websites']);
-	
-	dbTrans.oncomplete = function(event){
-		// Not sure what to do yet
-	};
-	
+
 	dbTrans.onerror = function(event){
 		// Handle these somehow
 	};
@@ -67,65 +54,41 @@ dbReq.onerror = function(){
 
 function dbVersionChange(event)
 {
-//TODO: Will have to handle the issue of rollbacks incase of an error
-	var objStore = {};
+	var websitesStore = {};
+	
+	var newsRecDB = event.target.result;
 	if(!newsRecDB.objectStoreNames.contains('websites'))
 	{
-		// Using this the wrong way, but I'm lazy right now and this db async stuff is weird.
-		// I like blocked for small things like this
 		///// Create datastore
-		// Possible point of expanding the extension, which is why this is named that way
-		objStore = newsRecDB.createObjectStore("websites", {keyPath: "name"});
-		
+		// Possible point of expanding the extension, which is why this is named this way
+		websitesStore = newsRecDB.createObjectStore("websites", {keyPath: "name"});
 	}
 	else
 	{
-		objStore = newsRecDB.transaction(['websites'], "readwrite").objectStore("websites");
+		websitesStore = newsRecDB.transaction(['websites'], "readwrite").objectStore("websites");
 	}
 	
-	//console.log(objStore);
-	
-	objStore.onsuccess = function(event){
-		
-		// Check if classObj exists
-		if((classObjs === null) || (classObjs === 'undefined')){
-			//classObjs = defaultObj;
-			// Save it ... not needed now
-			//localStorage.setItem('classObjs', JSON.stringify(classObjs));
-		}
-		else
-		{
-			// Turn into JSON object
-			classObjs = JSON.parse(classObjs);
-			
-			// Delete item from localStorage
-			localStorage.removeItem('classObjs');
-			
-			// Then store into indexedDB, this is the transition point
-			objStore.add({name: "newsAtYC", data: classObjs});
-		}
-		
-		// Make sure this thing exists
-		var newsYCData = objStore.get('newsAtYC');
-		newsYCData.onerror = function(event){
-			// If it doesn't exist create it
-			objStore.add({name: "newsAtYC", data: defaultObj});
-		}
+	// Add supported websites with the default object
+	for(websiteIndex in websites)
+	{
+//TODO: Need a way to check if the website already exists
+		var key = websites[websiteIndex].key;
+		websitesStore.add({name: key, data: defaultObj});
 	}
 	
 	// Let's notify user of a welcome message
 	var notification = webkitNotifications.createNotification(
 	  'icon.png',  // icon url - can be relative
 	  'First Run!',  // notification title
-	  "Hey! Thanks for installing me! \
-	   If you haven not already (since you've installed me), it is required that you go through two pages (press the 'more' link twice) in hacker news to train me! \
+	  "Thank you for installing me! \
+	   It is required that you click some articles and go through two pages (press the 'more' link twice) in hacker news to train me! \
 	   Have Fun!"  // notification body text
 	);
 	
 	notification.show(); // Show that shiz
 	
 	// Close after awhile
-	setTimeout(function(){notification.cancel()}, 15000);
+	setTimeout(function(){notification.cancel()}, 10000);
 }
 
 function initalize()
@@ -138,7 +101,7 @@ function initalize()
 	///// Start sanity checks
 	if(online === null)
 	{
-		localStorage.setItem('hnNROnline', 'yes');
+		localStorage.setItem('exCROnline', 'yes');
 	}
 
 	if(recTextColor === null)
@@ -168,25 +131,27 @@ function initalize()
 	
 	// Read database from IndexedDB
 	var dbTrans = newsRecDB.transaction(['websites']);
-	
-	dbTrans.oncomplete = function(event){
-		// Not sure what to do yet
-	};
-	
+		
 	dbTrans.onerror = function(event){
-		// Handle these somehow
+		// Handle this somehow
+		// Potentially throw an exception
 	};
 	
 	// Finally we can start
-	var objStoreGet = dbTrans.objectStore('websites').get('newsAtYC');
-	objStoreGet.onsuccess = function(event){
-		classObjs = event.target.result.data; // :) Good stuff, hmm i actually kind of hate it haha
-		//console.log(classObjs);
-		// Start the classifier
-		weights = getWeights(readFreq);
-		hnClassifier = new NaiveBayesText(classObjs, weights); // Create one single instance
-		//console.log(hnClassifier.getClassObj()); // Debug purposes
-	}
+	weights = getWeights(readFreq);
+	$.each(websites, function(index){
+		var website = websites[index];
+		var objStoreGet = dbTrans.objectStore('websites').get(website.key);
+		objStoreGet.onsuccess = function(event){
+			var website = websites[index];
+			// Load in structure for website
+			website.classObjs = event.target.result.data;
+			
+			// Start the classifier
+			website.classifier = new NaiveBayesText(website.classObjs, weights);
+			//console.log(website.classifier.getClassObj()); // Debug purposes
+		}
+	});
 }
 
 function setPageAction(tab)
@@ -222,11 +187,19 @@ function togglePageAction()
 		online = "yes";
 	}
 	
-	localStorage.setItem('hnNROnline', online);
+	localStorage.setItem('exCROnline', online);
 }
 
 function tabUpdated (tabId, changeInfo, tab){
-	if(tab.url.match(newsUrl))
+	var showIcon = false;
+	
+	// Should we show the icon?
+	$.each(websites, function(index){
+		var website = websites[index];
+		if(tab.url.match(website.regExp))
+			showIcon = true;
+	});
+	if(showIcon)
 	{
 		setPageAction(tab);
 		if(changeInfo.status === "complete")
@@ -243,6 +216,25 @@ function tabUpdated (tabId, changeInfo, tab){
 
 function sendRequestHandler(messageData, sender, sendResponse){
 	var response = {}
+	var exClassifier = null;
+	var websiteKey = '';
+	var websiteClassObjs = {};
+	var tabUrl = sender.tab.url;
+	
+	// Find which website data we need
+	$.each(websites, function(index){
+		if(tabUrl.match(websites[index].regExp) !== null)
+		{
+			var website = websites[index];
+			websiteKey = website.key;
+			websiteClassObjs = website.classObjs;
+			exClassifier = website.classifier;
+			return false;
+		}
+	});
+	
+	if(exClassifier === null) return;
+	
 	switch(messageData.request)
 	{
 		case "available":
@@ -253,7 +245,7 @@ function sendRequestHandler(messageData, sender, sendResponse){
 			else
 			{
 				online = messageData.value
-				localStorage.setItem('hnNROnline', online);
+				localStorage.setItem('exCROnline', online);
 			}
 		break;
 		case "classify":
@@ -264,7 +256,7 @@ function sendRequestHandler(messageData, sender, sendResponse){
 			response.highlightColors = [];
 			
 			// We need enough data before we can classify
-			var trainedCount = hnClassifier.dataCount();
+			var trainedCount = exClassifier.dataCount();
 			// Debug purposes
 			//console.log(trainedCount);
 			if(trainedCount < 60)
@@ -277,7 +269,7 @@ function sendRequestHandler(messageData, sender, sendResponse){
 			// Try to classify
 			$.each(articleData, function(index){
 				var title = articleData[index].title;
-				var decision = hnClassifier.classify(title);
+				var decision = exClassifier.classify(title);
 				
 				// Lets see if it works
 				if(decision === 1)
@@ -300,13 +292,13 @@ function sendRequestHandler(messageData, sender, sendResponse){
 				var hash = hex_md5(article.title+article.link);
 				
 				// Add to result set and label it as not interested
-				if(!hnClassifier.dataExists(hash))
+				if(!exClassifier.dataExists(hash))
 				{
 					finalResultSet.push(article.title);
-					hnClassifier.label(hash, 0);
+					exClassifier.label(hash, 0);
 				}
 			});
-			hnClassifier.train(finalResultSet); // Array 
+			exClassifier.train(finalResultSet); // Array 
 		break;
 		case "label":
 			// Online learning purposes only
@@ -323,11 +315,11 @@ function sendRequestHandler(messageData, sender, sendResponse){
 			var hash = hex_md5(sTitle+link);
 			
 			// Only if we've never encountered the data point before
-			if(!hnClassifier.dataExists(hash))
+			if(!exClassifier.dataExists(hash))
 			{
 				// Label the data
-				hnClassifier.label(hash, label);
-				hnClassifier.train(sTitle);
+				exClassifier.label(hash, label);
+				exClassifier.train(sTitle);
 			}
 		break;
 		case "addTabData":
@@ -338,21 +330,24 @@ function sendRequestHandler(messageData, sender, sendResponse){
 			var tabId = sender.tab.id;
 			delete tabsArticleData[tabId];
 			/*
-			  If someone can think of a better place to put this :(
 			  The intention is to save the classObjs whenever a tab is closed
 			  IDEALLY, it would be when the extension is closed or unloading, but chrome is finicky with 
 			  that so here we are.
 			*/
-			dbSaveClassObjs('newsAtYC', classObjs);
+			
+			dbSaveClassObjs(websiteKey, websiteClassObjs);
 		break;
 		case "resetColData":
 			// First clear the class object then reinitialize.
-			classObjs = defaultObj;
-			hnClassifier = new NaiveBayesText(classObjs, weights);
 			tabsArticleData = {};
 			
 			// Clear the data in the db
-			dbSaveClassObjs('newsAtYC', classObjs);
+			$.each(websites, function(index){
+				var key = websites[index].key;
+				var classObjs = websites[index].classObjs = defaultObj;
+				websites[index].exClassifier = new NaiveBayesText(classObjs, weights);
+				dbSaveClassObjs(key, classObjs);
+			});
 		break;
 		case "changeColors":
 			if(messageData.type == 'recTextColor')
@@ -374,8 +369,8 @@ function sendRequestHandler(messageData, sender, sendResponse){
 		case "changeReadFreq":
 			readFreq = messageData.readFreq;
 			weights = getWeights(readFreq);
-			classObjs = hnClassifier.getClassObj(); // Save for now
-			hnClassifier = new NaiveBayesText(classObjs, weights); // Reinitialize
+			classObjs = exClassifier.getClassObj(); // Save for now
+			exClassifier = new NaiveBayesText(classObjs, weights); // Reinitialize
 			localStorage.setItem('readFreq', readFreq); // save read frequency
 		break;
 		default:
@@ -389,7 +384,6 @@ function sendRequestHandler(messageData, sender, sendResponse){
 
 function dbSaveClassObjs(website, classObjs)
 {
-	//localStorage.setItem('classObjs', JSON.stringify(classObjs));
 	var dbTrans = newsRecDB.transaction(['websites'], "readwrite").objectStore('websites');
 	dbTrans.put({name: website, data: classObjs});
 }

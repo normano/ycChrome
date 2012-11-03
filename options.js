@@ -1,5 +1,5 @@
 $(document).ready(function(){
-	var extOnline = localStorage.getItem('hnNROnline');
+	var extOnline = localStorage.getItem('exCROnline');
 	
 	// Reading Frequency
 	var readFreq = localStorage.getItem('readFreq');
@@ -48,7 +48,7 @@ $(document).ready(function(){
 
 	$('#recommenderSwitch').click(function(){
 		extOnline = ((extOnline === "yes") ? "no" : "yes");
-		localStorage.setItem('hnNROnline', extOnline);
+		localStorage.setItem('exCROnline', extOnline);
 		toggleOnlineStatus();
 		chrome.extension.sendMessage({request:"available", value:extOnline});
 	});

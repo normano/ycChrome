@@ -1,6 +1,6 @@
-HackerNews News recommender for Google Chrome
+ExContent Recommender for Google Chrome
 
-Uses the naive bayes classifier for classification of posts you found interesting and not interesting. It attempts to predict what you like based of your past interactions. If you'd like to learn more visit http://normansoven.com/blog/?p=651
+The ExContent Recommender uses a variant of the naive bayes classifier for classification of interesting and not interesting posts. It highlights the ones that were highlighted as interesting. In other words, it attempts to predict what you like based on articles you clicked. If you'd like to learn more visit http://normansoven.com/blog/?p=651
 
 How to use:
 If you currently have the extension installed, remove it.
@@ -8,6 +8,6 @@ If you currently have the extension installed, remove it.
 2. Click Load unpacked extension and go to the folder that contains the source code.
 Done, simple as pie!.
 
-When ever you make changes to your version of the extension, while on the extensions page,click reload under the extension.
+Whenever you make changes to your version of the extension, while on the extensions page click reload under the extension.
 
 Hope this helps!
